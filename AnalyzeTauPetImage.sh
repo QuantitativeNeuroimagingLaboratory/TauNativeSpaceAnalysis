@@ -1,5 +1,6 @@
 #!/bin/bash
 #This script registers Tau PET image to FreeSurfer image and creates masks and normalized SUVR image. Creates 4 ADNI lobar regions and Baraak Stages. Saves all values to a stats file. Make sure all necessary python and bash codes are copied to the same directory. 
+#This is an internal script to be used exclusively in our lab and it is not ready to be used in general case. QNL does not premit and/or does not take the responsibility of using this script in any other setting or laboratory.   
 
 # Usage: AnalyzeTauPetImage.sh <InputDynamicPETimage> <FreeSurferDir> <OutputDir>
 
