@@ -1,12 +1,12 @@
 #!/bin/bash
-#This script registers Tau PET image to FreeSurfer image and creates masks and normalized SUVR image. Creates 4 ADNI ROIs. Applies 4 ADNI ROIs. Saves all values to a stats file
+#This script registers Tau PET image to FreeSurfer image and creates masks and normalized SUVR image. Creates 4 ADNI lobar regions and Baraak Stages. Saves all values to a stats file. Make sure all necessary python and bash codes are copied to the same directory. 
 
 # Usage: AnalyzeTauPetImage.sh <InputDynamicPETimage> <FreeSurferDir> <OutputDir>
 
 
 if [ "$#" -ne 3 ]; then
     echo "Illegal number of parameters, use following syntax"
-    echo "Usage: AnalyzePetImage.sh <InputDynamicPETimage> <FreeSurferDir> <OutputDir>"
+    echo "Usage: AnalyzeTauPetImage.sh <InputDynamicPETimage> <FreeSurferDir> <OutputDir>"
     exit 1
 fi
 
@@ -32,7 +32,31 @@ echo ${2}
 echo "An the results will be saved in the following directory"
 echo ${3}
 
+# Set the path for other dependencies (Default is the directory of current script)
+# You need to chnage this  if the dependencies are copied somewhereelse 
 
+FullFileName=${0}
+ScriptDir=${FullFileName%/*}
+
+echo "Looking for dependencies in this directory"
+echo $ScriptDir
+
+ls ${ScriptDir}/ExtractRegionalTauPETUptake.py
+if [ $? -ne 0 ]; then
+    echo "The dependencies are not in the same directory"
+    exit 3
+fi
+
+ls ${ScriptDir}/TransferingTauPetImagesToStandardSpace.sh 
+if [ $? -ne 0 ]; then
+    echo "The dependencies are not in the same directory"
+    exit 3
+fi
+
+
+
+
+# Set output directory name and input image file name
 SubDir=${3}
 PETImage=${1} 
 
@@ -92,14 +116,20 @@ fslmaths ${FSLabel} -thr 46 -uthr 46 -bin -add ${SubDir}/CerebellumWhiteMatterMa
 fslmaths ${FSLabel} -thr 8 -uthr 8 -bin ${SubDir}/CerebellumGrayMatterMask.nii.gz
 fslmaths ${FSLabel} -thr 47 -uthr 47 -bin -add ${SubDir}/CerebellumGrayMatterMask.nii.gz ${SubDir}/CerebellumGrayMatterMask.nii.gz
 
-echo 'Dialate cerebellum white matetr mask by 2 voxel'
-fslmaths ${SubDir}/CerebellumWhiteMatterMask.nii.gz -kernel box 5 -dilM  ${SubDir}/CerebellumWhiteMatterMaskDialated.nii.gz
+echo 'Dialate cerebellum white matetr mask by 1 voxel'
+fslmaths ${SubDir}/CerebellumWhiteMatterMask.nii.gz -kernel box 3 -dilM  ${SubDir}/CerebellumWhiteMatterMaskDialated.nii.gz
 
 echo 'Subtract the Dialate cerebelum white matter mask from Gray matter mask to make sure no white matter voxels are considered for suv computation'
 fslmaths ${SubDir}/CerebellumGrayMatterMask.nii.gz -sub ${SubDir}/CerebellumWhiteMatterMaskDialated.nii.gz -thr 0 -bin ${SubDir}/CerebellumGrayMatterMaskNoWhite.nii.gz;     
 
 echo 'Mask PET image with the generated gray matter mask to compute the average uptake in cerebelum gray matter' 
 fslmaths ${SubDir}/PET_RegisteredSatatic_NuSpace.nii.gz -mas ${SubDir}/CerebellumGrayMatterMaskNoWhite.nii.gz ${SubDir}/PET_RegisteredSatatic_NuSpace_CerebellumGrayMatter.nii.gz; 
+
+echo 'Average the cerebelum gray matter voxel intensities to get the SUV'
+suvr=`fslstats ${SubDir}/PET_RegisteredSatatic_NuSpace_CerebellumGrayMatter.nii.gz -M`;
+
+echo 'Divid all the PET image intensity value by SUV value to get the SUVR image'
+fslmaths ${SubDir}/PET_RegisteredSatatic_NuSpace.nii.gz -div $suvr ${SubDir}/PET_RegisteredSatatic_NuSpace_SUVR.nii.gz;
 
 
 echo 'Obtain cerebral white matter mask'
@@ -111,8 +141,8 @@ fslmaths ${SubDir}/CerebralWhiteMatterMask.nii.gz -kernel box 3 -dilM  ${SubDir}
 
 
 
-ExtractRegionalTauPETUptake.py ${SubDir}
-TransferingTauPetImagesToStandardSpace.sh ${SubDir}
+${ScriptDir}/ExtractRegionalTauPETUptake.py ${SubDir}
+${ScriptDir}/TransferingTauPetImagesToStandardSpace.sh ${SubDir}
 
 echo "Well...I finished...";
 echo `date`
